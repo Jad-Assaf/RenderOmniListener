@@ -15,6 +15,11 @@
   "type": "commonjs",
   "main": "listener.js",
   "scripts": {
+    "start": "node listener.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "pg": "^8.11.5",
+    "ws": "^8.16.0"
   }
 }

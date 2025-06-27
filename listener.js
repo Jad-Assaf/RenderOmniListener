@@ -1,23 +1,36 @@
-// listener.js  (ES-module style)
+/* Keep one Postgres LISTEN connection and broadcast every NOTIFY payload
+   to all connected WebSocket clients. Runs 24 × 7 on a Render Background
+   Worker (or Web Service). */
 
-/* eslint-disable no-console */
 import pg from "pg";
 import WebSocket, { WebSocketServer } from "ws";
 
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // ← add this line
-});
+/* ── 1. Postgres pool (TLS without CA verification) ──────────────── */
+const rawUrl = process.env.DATABASE_URL;
+if (!rawUrl) {
+  console.error("DATABASE_URL env var is missing");
+  process.exit(1);
+}
 
+/* node-postgres honours sslmode in the query-string; override
+      “require” so it won’t look for a trusted CA. */
+const connStr = rawUrl.includes("sslmode=require")
+  ? rawUrl.replace("sslmode=require", "sslmode=no-verify")
+  : `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}sslmode=no-verify`;
+
+const pool = new pg.Pool({ connectionString: connStr });
+
+/* ── 2. WebSocket hub on port 8080 ───────────────────────────────── */
 const wss = new WebSocketServer({ port: 8080 });
 
 function broadcast(json) {
   const data = JSON.stringify(json);
-  wss.clients.forEach((c) => {
+  for (const c of wss.clients) {
     if (c.readyState === WebSocket.OPEN) c.send(data);
-  });
+  }
 }
 
+/* ── 3. Listen to Postgres channel and relay ─────────────────────── */
 (async () => {
   const client = await pool.connect();
   await client.query("LISTEN new_message");
@@ -26,11 +39,18 @@ function broadcast(json) {
     try {
       const payload = JSON.parse(msg.payload ?? "{}");
       broadcast(payload);
-    } catch (e) {
-      console.error("Bad payload:", e);
+    } catch (err) {
+      console.error("Bad payload:", err);
     }
   });
 
-  // ping every 10 min to keep the TCP session fresh
-  setInterval(() => client.query("SELECT 1"), 600_000);
-})();
+  /* keep TCP session alive */
+  setInterval(() => {
+    client
+      .query("SELECT 1")
+      .catch((err) => console.error("keep-alive failed:", err));
+  }, 600_000);
+})().catch((err) => {
+  console.error("Listener crashed:", err);
+  process.exit(1);
+});

@@ -1,22 +1,10 @@
 {
   "name": "render-listener",
   "version": "1.0.0",
-  "description": "",
-  "homepage": "https://github.com/Jad-Assaf/RenderOmniListener#readme",
-  "bugs": {
-    "url": "https://github.com/Jad-Assaf/RenderOmniListener/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Jad-Assaf/RenderOmniListener.git"
-  },
-  "license": "ISC",
-  "author": "",
   "type": "module",
   "main": "listener.js",
   "scripts": {
-    "start": "node listener.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node listener.js"
   },
   "dependencies": {
     "pg": "^8.11.5",
